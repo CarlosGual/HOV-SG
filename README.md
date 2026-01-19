@@ -63,7 +63,7 @@ wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth -O che
 ### Habitat Matterport 3D Semantics
 HOV-SG takes posed RGB-D sequences as input. In order to produce hierarchical multi-story scenes we make use of the Habitat 3D Semantics dataset ([HM3DSem](https://aihabitat.org/datasets/hm3d-semantics/)). 
 
-- Download the [Habitat Matterport 3D Semantics](https://github.com/matterport/habitat-matterport-3dresearch) dataset. More specifically, download through the links corresponding to these filenames: `hm3d-val-habitat-v0.2.tar`, `hm3d-val-semantic-annots-v0.2.tar`, `hm3d-val-semantic-configs-v0.2.tar`.
+- Download the [Habitat Matterport 3D Semantics](https://github.com/matterport/habitat-matterport-3dresearch) dataset. More specifically, download through the links corresponding to these filenames: [hm3d-val-habitat-v0.2.tar](https://api.matterport.com/resources/habitat/hm3d-val-habitat-v0.2.tar), [hm3d-val-semantic-annots-v0.2.tar](https://api.matterport.com/resources/habitat/hm3d-val-semantic-annots-v0.2.tar), [hm3d-val-semantic-configs-v0.2.tar](	https://api.matterport.com/resources/habitat/hm3d-val-semantic-configs-v0.2.tar).
     <details>
     <summary>Make sure that the raw HM3D dataset has the following structure:</summary>
     
