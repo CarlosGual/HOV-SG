@@ -236,22 +236,6 @@ class HM3DSemanticEvaluator:
 
         # find openmap room corresponding to each gt room based on distance between centers
         room_association_matrix = np.zeros((len(pred_rooms), len(gt_rooms)))
-        for gt_floor in gt_floors:
-            for gt_room in gt_rooms:
-                if gt_room.mean_height > gt_floor.lower and gt_room.mean_height < gt_floor.upper:
-                    for pred_room in pred_rooms:
-                        pred_room_points = np.asarray(pred_room.pcd.points)
-                        pred_mean_height = pred_room.room_zero_level + pred_room.room_height / 2
-                        if pred_mean_height > gt_room.min_height and pred_mean_height < gt_room.max_height:
-                            pred_room.bev_pcd = o3d.geometry.PointCloud()
-                            pred_room_points[:, 1] = gt_room.min_height  # overwrite this to get planes on same height
-                            pred_room.bev_pcd.points = o3d.utility.Vector3dVector(pred_room_points)
-                            gt_room.bev_pcd = gt_room.bev_pcd.voxel_down_sample(voxel_size=0.05)
-                            pred_room.bev_pcd = pred_room.bev_pcd.voxel_down_sample(voxel_size=0.05)
-                            overlap = find_overlapping_ratio_faiss(pred_room.bev_pcd, gt_room.bev_pcd, 0.05)
-
-                            room_association_matrix[pred_rooms.index(pred_room)][gt_rooms.index(gt_room)] = overlap
-
         hydra_room_overlap_over_pred = np.zeros((len(pred_rooms), len(gt_rooms)))
         hydra_room_overlap_over_gt = np.zeros((len(pred_rooms), len(gt_rooms)))
         for gt_floor in gt_floors:
@@ -261,6 +245,17 @@ class HM3DSemanticEvaluator:
                         pred_room_points = np.asarray(pred_room.pcd.points)
                         pred_mean_height = pred_room.room_zero_level + pred_room.room_height / 2
                         if pred_mean_height > gt_room.min_height and pred_mean_height < gt_room.max_height:
+                            # --- association overlap (from first loop) ---
+                            pred_room.bev_pcd = o3d.geometry.PointCloud()
+                            pred_room_points[:, 1] = gt_room.min_height  # overwrite this to get planes on same height
+                            pred_room.bev_pcd.points = o3d.utility.Vector3dVector(pred_room_points)
+                            gt_room.bev_pcd = gt_room.bev_pcd.voxel_down_sample(voxel_size=0.05)
+                            pred_room.bev_pcd = pred_room.bev_pcd.voxel_down_sample(voxel_size=0.05)
+                            overlap = find_overlapping_ratio_faiss(pred_room.bev_pcd, gt_room.bev_pcd, 0.05)
+
+                            room_association_matrix[pred_rooms.index(pred_room)][gt_rooms.index(gt_room)] = overlap
+
+                            # --- directional intersection shares (from second loop) ---
                             pred_room.bev_pcd = o3d.geometry.PointCloud()
                             pred_room_points[:, 1] = gt_room.min_height  # overwrite this to get planes on same height
                             pred_room.bev_pcd.points = o3d.utility.Vector3dVector(pred_room_points)
