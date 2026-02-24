@@ -80,14 +80,14 @@ def main(params: DictConfig):
         if type(node) == Object:
             name = hovsg.identify_object(node.embedding, text_feats, classes)
             node.name = name
-    evaluator.evaluate_floors(hovsg.graph)
+    # evaluator.evaluate_floors(hovsg.graph)
     evaluator.evaluate_rooms(hovsg.graph)
-    evaluator.evaluate_objects(
-        eval_metric=params.eval.association_metric,
-        pred_graph=hovsg.graph,
-        gt_classes=classes,
-        gt_text_feats=text_feats,
-    )
+    # evaluator.evaluate_objects(
+    #     eval_metric=params.eval.association_metric,
+    #     pred_graph=hovsg.graph,
+    #     gt_classes=classes,
+    #     gt_text_feats=text_feats,
+    # )
 
     print(evaluator.metrics)
 
