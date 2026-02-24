@@ -139,18 +139,41 @@ class Graph:
             print("Dataset not supported")
             return
 
-    def create_feature_map(self, save_path=None):
+    def reset(self):
+        """
+        Reset all accumulated state so the graph can be rebuilt from scratch
+        for a new incremental step.
+        """
+        self.full_pcd = o3d.geometry.PointCloud()
+        self.mask_feats = []
+        self.mask_feats_d = []
+        self.mask_pcds = []
+        self.mask_weights = []
+        self.objects = []
+        self.rooms = []
+        self.floors = []
+        self.full_feats_array = []
+        self.graph = nx.Graph()
+        self.graph.add_node(0, name="building", type="building")
+        self.room_masks = {}
+
+    def create_feature_map(self, save_path=None, max_frame=None):
         """
         Create the feature map of the HOV-SG (full point cloud + feature map point level + feature map mask level)
         :param save_path : str, optional, The path to save the feature map
+        :param max_frame : int, optional, exclusive upper bound on dataset indices to process.
+                           If None, processes all frames.
         """
 
         if self.dataset is None:
             print("No dataset loaded")
             return
 
+        if max_frame is None:
+            max_frame = len(self.dataset)
+
         # create the RGB-D point cloud
-        for i in tqdm(range(0, len(self.dataset), self.cfg.pipeline.skip_frames), desc="Creating RGB-D point cloud"):
+        for i in tqdm(range(0, max_frame, self.cfg.pipeline.skip_frames), desc="Creating RGB-D point cloud"):
             rgb_image, depth_image, pose, _, depth_intrinsics = self.dataset[i]
             self.full_pcd += self.dataset.create_pcd(rgb_image, depth_image, pose)
 
@@ -170,7 +193,7 @@ class Graph:
         # extract features for each frame
         frames_pcd = []
         frames_feats = []
-        for i in tqdm(range(0, len(self.dataset), self.cfg.pipeline.skip_frames), desc="Extracting features"):
+        for i in tqdm(range(0, max_frame, self.cfg.pipeline.skip_frames), desc="Extracting features"):
             rgb_image, depth_image, pose, _, _ = self.dataset[i]
             if rgb_image.size != depth_image.size:
                 rgb_image = rgb_image.resize(depth_image.size)
@@ -375,11 +398,12 @@ class Graph:
             floors_pcd.append(floor_pcd)
         return floors
 
-    def segment_rooms(self, floor: Floor, path):
+    def segment_rooms(self, floor: Floor, path, max_frame=None):
         """
         Segment the rooms from the floor point cloud
         :param floor: Floor, The floor object
         :param path: str, The path to save the intermediate results
+        :param max_frame: int, optional, exclusive upper bound on dataset indices to process.
         """
 
         tmp_floor_path = os.path.join(self.graph_tmp_folder, floor.floor_id)
@@ -532,7 +556,8 @@ class Graph:
         F_g_list = []
 
         all_global_clip_feats = dict()
-        for i, img_id in tqdm(enumerate(range(0, len(self.dataset), self.cfg.pipeline.skip_frames)), desc="Computing room features"):
+        _max_frame = max_frame if max_frame is not None else len(self.dataset)
+        for i, img_id in tqdm(enumerate(range(0, _max_frame, self.cfg.pipeline.skip_frames)), desc="Computing room features"):
             rgb_image, _, pose, _, _ = self.dataset[img_id]
             F_g = get_img_feats(np.array(rgb_image), self.preprocess, self.clip_model)
             all_global_clip_feats[str(img_id)] = F_g
@@ -805,17 +830,18 @@ class Graph:
         print("# pred objects: ", len(self.objects))
         print("-------------------")
 
-    def build_graph(self, save_path=None):
+    def build_graph(self, save_path=None, max_frame=None):
         """
         Build the HOV-SG, by segmenting the floors, rooms, and objects and creating the graph.
         :param save_path: str, The path to save the intermediate results
+        :param max_frame: int, optional, exclusive upper bound on dataset indices to process.
         """
         print("segmenting floors...")
         self.segment_floors(save_path)
 
         print("segmenting rooms...")
         for floor in self.floors:
-            self.segment_rooms(floor, save_path)
+            self.segment_rooms(floor, save_path, max_frame=max_frame)
 
         print("segmenting/identifying objects...")
         self.segment_objects(save_path)
@@ -833,7 +859,7 @@ class Graph:
         self.create_graph()
 
         # create navigation graph for each floor
-        self.create_nav_graph()
+        self.create_nav_graph(max_frame=max_frame)
 
         # save the graph
         self.save_graph(os.path.join(save_path, "graph"))
@@ -843,9 +869,10 @@ class Graph:
         print("# objects: ", len(self.objects))
         print("--> HOV-SG representation successfully built")
 
-    def create_nav_graph(self):
+    def create_nav_graph(self, max_frame=None):
         """
         Create the navigation graph for each floor and connect the floors together
+        :param max_frame: int, optional, exclusive upper bound on dataset indices to process.
         """
         last_nav_graph = None
         global_voronoi = None
@@ -855,8 +882,9 @@ class Graph:
         os.makedirs(nav_dir, exist_ok=True)
 
         # get pose list
+        _max_frame = max_frame if max_frame is not None else len(self.dataset)
         poses_list = []
-        for i in range(0, len(self.dataset), self.cfg.pipeline.skip_frames):
+        for i in range(0, _max_frame, self.cfg.pipeline.skip_frames):
             _, _, pose, _, _ = self.dataset[i]
             poses_list.append(pose)
 

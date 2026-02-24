@@ -26,8 +26,9 @@ models:
     min_mask_region_area: 100
 pipeline:
   create_graph: True
+  incremental: True
   voxel_size: 0.02
-  skip_frames: 10
+  skip_frames: 50
   init_overlap_thresh: 0.75
   overlap_thresh_factor: 0.025
   iou_thresh: 0.05
