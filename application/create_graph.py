@@ -1,22 +1,18 @@
 import os
 import hydra
-from numpy.ma.core import max_filler
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from hovsg.graph.graph import Graph
 
 # pylint: disable=all
 
 
-@hydra.main(version_base=None, config_path="../config", config_name="create_graph")
-def main(params: DictConfig):
-    # create logging directory
-    save_dir = os.path.join(params.main.save_path, params.main.dataset, params.main.scene_id)
-    params.main.save_path = save_dir
-    params.main.dataset_path = os.path.join(params.main.dataset_path, params.main.split, params.main.scene_id)
+def process_scene(params: DictConfig):
+    """Process a single scene: create feature map, save outputs, and optionally build graph."""
+    save_dir = params.main.save_path
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
-    # create graph object (loads models and dataset once)
+    # create graph object (loads models and dataset once per scene)
     hovsg = Graph(params)
 
     incremental = getattr(params.pipeline, "incremental", False)
@@ -77,6 +73,36 @@ def main(params: DictConfig):
                 print("Skipping hierarchical scene graph creation for Replica and ScanNet datasets.")
 
         print(f"\nIncremental graph creation complete — {len(frame_indices)} steps saved under {save_dir}")
+
+
+@hydra.main(version_base=None, config_path="../config", config_name="create_graph")
+def main(params: DictConfig):
+    # discover all scene directories under dataset_path/split that don't start with "no_use"
+    scenes_root = os.path.join(params.main.dataset_path, params.main.split)
+    scene_ids = sorted([
+        d for d in os.listdir(scenes_root)
+        if os.path.isdir(os.path.join(scenes_root, d)) and not d.startswith("no_use")
+    ])
+
+    print(f"Found {len(scene_ids)} scenes in {scenes_root}:")
+    for sid in scene_ids:
+        print(f"  - {sid}")
+
+    for scene_idx, scene_id in enumerate(scene_ids):
+        print(f"\n{'#'*60}")
+        print(f"Scene {scene_idx + 1}/{len(scene_ids)}: {scene_id}")
+        print(f"{'#'*60}")
+
+        # create a per-scene copy of the config with updated paths
+        scene_params = OmegaConf.create(OmegaConf.to_container(params, resolve=True))
+        scene_params.main.scene_id = scene_id
+        scene_params.main.save_path = os.path.join(params.main.save_path, params.main.dataset, scene_id)
+        scene_params.main.dataset_path = os.path.join(scenes_root, scene_id)
+
+        process_scene(scene_params)
+
+    print(f"\nAll {len(scene_ids)} scenes processed.")
+
 
 if __name__ == "__main__":
     main()
