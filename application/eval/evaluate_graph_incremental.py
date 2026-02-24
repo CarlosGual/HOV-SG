@@ -55,6 +55,7 @@ def main(params: DictConfig):
     frame_indices = []
     hydra_precisions = []
     hydra_recalls = []
+    hydra_recalls_all = []
     all_frame_metrics = {}
 
     for frame_dir_name in frame_dirs:
@@ -95,14 +96,15 @@ def main(params: DictConfig):
                 name = hovsg.identify_object(node.embedding, text_feats, classes)
                 node.name = name
 
-        # evaluate rooms
-        evaluator.evaluate_rooms(hovsg.graph)
+        # evaluate rooms (incremental=True: only visible GT rooms count for recall)
+        evaluator.evaluate_rooms(hovsg.graph, incremental=True)
 
         # collect metrics
         room_metrics = evaluator.metrics.get("rooms", {})
         frame_indices.append(frame_idx)
         hydra_precisions.append(float(room_metrics.get("hydra_prec", 0.0)))
         hydra_recalls.append(float(room_metrics.get("hydra_recall", 0.0)))
+        hydra_recalls_all.append(float(room_metrics.get("hydra_recall_all", 0.0)))
 
         # convert numpy types to native Python for JSON serialization
         serializable_metrics = {}
@@ -139,7 +141,8 @@ def main(params: DictConfig):
 
     # --- Plot hydra recall over frames ---
     fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(frame_indices, hydra_recalls, marker="o", linewidth=2, color="tab:orange", label="Hydra Recall")
+    ax.plot(frame_indices, hydra_recalls, marker="o", linewidth=2, color="tab:orange", label="Hydra Recall (visible GT)")
+    ax.plot(frame_indices, hydra_recalls_all, marker="x", linewidth=1.5, color="tab:orange", linestyle="--", alpha=0.6, label="Hydra Recall (all GT)")
     ax.set_xlabel("Frame Index")
     ax.set_ylabel("Hydra Recall")
     ax.set_title(f"Hydra Recall over Frames — {params.main.scene_id}")
@@ -155,7 +158,8 @@ def main(params: DictConfig):
     # --- Combined plot ---
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(frame_indices, hydra_precisions, marker="o", linewidth=2, label="Hydra Precision")
-    ax.plot(frame_indices, hydra_recalls, marker="s", linewidth=2, label="Hydra Recall")
+    ax.plot(frame_indices, hydra_recalls, marker="s", linewidth=2, label="Hydra Recall (visible GT)")
+    ax.plot(frame_indices, hydra_recalls_all, marker="x", linewidth=1.5, linestyle="--", alpha=0.6, label="Hydra Recall (all GT)")
     ax.set_xlabel("Frame Index")
     ax.set_ylabel("Score")
     ax.set_title(f"Hydra Precision & Recall over Frames — {params.main.scene_id}")

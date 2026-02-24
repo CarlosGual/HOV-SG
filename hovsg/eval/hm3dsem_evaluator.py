@@ -226,9 +226,13 @@ class HM3DSemanticEvaluator:
             print("{}: {}".format(k, v))
         print("----------------------------")
 
-    def evaluate_rooms(self, pred_graph):
+    def evaluate_rooms(self, pred_graph, incremental=False):
         """
         Evaluate the room prediction by comparing 3D IoU of the predicted room with the ground truth room
+        :param pred_graph: The predicted graph
+        :param incremental: bool, If True, only consider GT rooms that have been "seen"
+                            (i.e., have nonzero overlap with at least one predicted room)
+                            when computing hydra recall and FN.
         """
         gt_floors = [node for node in self.gt_graph.nodes if node.type == "floor"]
         gt_rooms = [node for node in self.gt_graph.nodes if node.type == "room"]
@@ -286,32 +290,52 @@ class HM3DSemanticEvaluator:
                                 gt_rooms.index(gt_room)
                             ] = overlap_over_gt
 
+        # Determine which GT rooms are "visible" (seen so far)
+        # A GT room is visible if any predicted room has nonzero overlap with it
+        if incremental and len(gt_rooms) > 0:
+            max_overlap_per_gt = np.max(hydra_room_overlap_over_gt, axis=0)  # shape (n_gt,)
+            visible_gt_mask = max_overlap_per_gt > 0
+            num_gt_visible = int(np.sum(visible_gt_mask))
+            print(f"Incremental mode: {num_gt_visible} / {len(gt_rooms)} GT rooms visible")
+        else:
+            visible_gt_mask = None
+            num_gt_visible = None
+
         hydra_precision = 0.0
         hydra_recall = 0.0
+        hydra_recall_all = 0.0
         for i in range(len(pred_rooms)):
             # get max overlap for each pred room
             prec_max_overlap = np.max(hydra_room_overlap_over_pred[i, :])
             hydra_precision += prec_max_overlap
 
+        # recall over ALL gt rooms (original metric)
         for j in range(len(gt_rooms)):
-            # get max overlap for each gt room
             rec_max_overlap = np.max(hydra_room_overlap_over_gt[:, j])
-            hydra_recall += rec_max_overlap
+            hydra_recall_all += rec_max_overlap
 
-        hydra_precision = hydra_precision / len(pred_rooms)
-        hydra_recall = hydra_recall / len(gt_rooms)
+        hydra_precision = hydra_precision / len(pred_rooms) if len(pred_rooms) > 0 else 0.0
+        hydra_recall_all = hydra_recall_all / len(gt_rooms) if len(gt_rooms) > 0 else 0.0
+
+        # recall over visible gt rooms only (incremental metric)
+        if visible_gt_mask is not None and np.any(visible_gt_mask):
+            max_overlaps_gt = np.max(hydra_room_overlap_over_gt, axis=0)
+            hydra_recall = float(np.mean(max_overlaps_gt[visible_gt_mask]))
+        else:
+            hydra_recall = hydra_recall_all
 
         # calculate TP, FP, FN for rooms
         row_ind, col_ind = linear_sum_assignment(room_association_matrix, maximize=True)
         acc_values = list()
         prec_values = list()
         rec_values = list()
+        n_gt_for_fn = num_gt_visible if num_gt_visible is not None else len(gt_rooms)
         for eval_idx, thresh in enumerate(np.linspace(0.0, 1.0, 11, endpoint=True)):
             TP, TN, FP, FN = 0, 0, 0, 0
             iou_threshold = thresh
             TP = np.sum(room_association_matrix[row_ind, col_ind] > iou_threshold)
             FP = len(pred_rooms) - TP
-            FN = len(gt_rooms) - TP
+            FN = max(0, n_gt_for_fn - TP)
 
             precision = TP / (TP + FP) if (TP + FP) > 0 else 0
             recall = TP / (TP + FN) if (TP + FN) > 0 else 0
@@ -331,9 +355,11 @@ class HM3DSemanticEvaluator:
             "prec@IoU=0.5": prec_values[6],
             "recall@IoU=0.5": rec_values[6],
             "gt": len(gt_rooms),
+            "gt_visible": num_gt_visible if num_gt_visible is not None else len(gt_rooms),
             "pred": len(pred_rooms),
             "hydra_prec": hydra_precision,
             "hydra_recall": hydra_recall,
+            "hydra_recall_all": hydra_recall_all,
         }
         self.metrics["rooms"] = room_metrics
         for k, v in room_metrics.items():
