@@ -38,8 +38,11 @@ def main(params: DictConfig):
         # --- Incremental mode: build a new graph at every frame step ---
         skip = params.pipeline.skip_frames
         dataset_len = len(hovsg.dataset)
-        # frame indices that will be processed: 0, skip, 2*skip, ...
+        # frame indices that will be processed: 10, 10+skip, 10+2*skip, ...
         frame_indices = list(range(10, dataset_len, skip))
+        # Start from the third idx so the creation graph logic works
+        # (problems with floors [at least has to be one] and rooms detections [at least has to be two o them])
+        frame_indices = frame_indices[4:]
         if frame_indices[-1] < dataset_len - 1:
             frame_indices.append(dataset_len - 1)
 

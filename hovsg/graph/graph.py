@@ -173,7 +173,7 @@ class Graph:
             max_frame = len(self.dataset)
 
         # create the RGB-D point cloud
-        for i in tqdm(range(0, max_frame, self.cfg.pipeline.skip_frames), desc="Creating RGB-D point cloud"):
+        for i in tqdm(range(10, max_frame, self.cfg.pipeline.skip_frames), desc="Creating RGB-D point cloud"):
             rgb_image, depth_image, pose, _, depth_intrinsics = self.dataset[i]
             self.full_pcd += self.dataset.create_pcd(rgb_image, depth_image, pose)
 
@@ -193,7 +193,7 @@ class Graph:
         # extract features for each frame
         frames_pcd = []
         frames_feats = []
-        for i in tqdm(range(0, max_frame, self.cfg.pipeline.skip_frames), desc="Extracting features"):
+        for i in tqdm(range(10, max_frame, self.cfg.pipeline.skip_frames), desc="Extracting features"):
             rgb_image, depth_image, pose, _, _ = self.dataset[i]
             if rgb_image.size != depth_image.size:
                 rgb_image = rgb_image.resize(depth_image.size)
@@ -557,7 +557,7 @@ class Graph:
 
         all_global_clip_feats = dict()
         _max_frame = max_frame if max_frame is not None else len(self.dataset)
-        for i, img_id in tqdm(enumerate(range(0, _max_frame, self.cfg.pipeline.skip_frames)), desc="Computing room features"):
+        for i, img_id in tqdm(enumerate(range(10, _max_frame, self.cfg.pipeline.skip_frames)), desc="Computing room features"):
             rgb_image, _, pose, _, _ = self.dataset[img_id]
             F_g = get_img_feats(np.array(rgb_image), self.preprocess, self.clip_model)
             all_global_clip_feats[str(img_id)] = F_g
@@ -884,7 +884,7 @@ class Graph:
         # get pose list
         _max_frame = max_frame if max_frame is not None else len(self.dataset)
         poses_list = []
-        for i in range(0, _max_frame, self.cfg.pipeline.skip_frames):
+        for i in range(10, _max_frame, self.cfg.pipeline.skip_frames):
             _, _, pose, _, _ = self.dataset[i]
             poses_list.append(pose)
 
