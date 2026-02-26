@@ -56,6 +56,7 @@ def main(params: DictConfig):
     hydra_precisions = []
     hydra_recalls = []
     hydra_recalls_all = []
+    hydra_f1s = []
     all_frame_metrics = {}
 
     for frame_dir_name in frame_dirs:
@@ -102,9 +103,14 @@ def main(params: DictConfig):
         # collect metrics
         room_metrics = evaluator.metrics.get("rooms", {})
         frame_indices.append(frame_idx)
-        hydra_precisions.append(float(room_metrics.get("hydra_prec", 0.0)))
-        hydra_recalls.append(float(room_metrics.get("hydra_recall", 0.0)))
-        hydra_recalls_all.append(float(room_metrics.get("hydra_recall_all", 0.0)))
+        prec = float(room_metrics.get("hydra_prec", 0.0))
+        rec = float(room_metrics.get("hydra_recall", 0.0))
+        rec_all = float(room_metrics.get("hydra_recall_all", 0.0))
+        f1 = 2.0 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        hydra_precisions.append(prec)
+        hydra_recalls.append(rec)
+        hydra_recalls_all.append(rec_all)
+        hydra_f1s.append(f1)
 
         # convert numpy types to native Python for JSON serialization
         serializable_metrics = {}
@@ -113,6 +119,7 @@ def main(params: DictConfig):
                 serializable_metrics[k] = float(v)
             else:
                 serializable_metrics[k] = v
+        serializable_metrics["hydra_f1"] = f1
 
         all_frame_metrics[frame_dir_name] = serializable_metrics
 
@@ -160,9 +167,10 @@ def main(params: DictConfig):
     ax.plot(frame_indices, hydra_precisions, marker="o", linewidth=2, label="Hydra Precision")
     ax.plot(frame_indices, hydra_recalls, marker="s", linewidth=2, label="Hydra Recall (visible GT)")
     ax.plot(frame_indices, hydra_recalls_all, marker="x", linewidth=1.5, linestyle="--", alpha=0.6, label="Hydra Recall (all GT)")
+    ax.plot(frame_indices, hydra_f1s, marker="D", linewidth=2, color="tab:green", label="m-iF1")
     ax.set_xlabel("Frame Index")
     ax.set_ylabel("Score")
-    ax.set_title(f"Hydra Precision & Recall over Frames — {params.main.scene_id}")
+    ax.set_title(f"Hydra Precision, Recall & F1 over Frames — {params.main.scene_id}")
     ax.set_ylim(0, 1.05)
     ax.grid(True, alpha=0.3)
     ax.legend()
@@ -171,6 +179,21 @@ def main(params: DictConfig):
     fig.savefig(combined_plot_path, dpi=150)
     plt.close(fig)
     print(f"Combined plot saved to {combined_plot_path}")
+
+    # --- F1 plot ---
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(frame_indices, hydra_f1s, marker="D", linewidth=2, color="tab:green", label="m-iF1")
+    ax.set_xlabel("Frame Index")
+    ax.set_ylabel("m-iF1")
+    ax.set_title(f"m-iF1 over Frames — {params.main.scene_id}")
+    ax.set_ylim(0, 1.05)
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    f1_plot_path = os.path.join(eval_output_dir, "hydra_f1_over_frames.png")
+    fig.savefig(f1_plot_path, dpi=150)
+    plt.close(fig)
+    print(f"F1 plot saved to {f1_plot_path}")
 
     print(f"\nIncremental evaluation complete — {len(frame_indices)} frames evaluated.")
 

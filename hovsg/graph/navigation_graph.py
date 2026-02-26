@@ -321,6 +321,8 @@ class NavigationGraph:
             pose_map (np.ndarray): The resulting pose region grid map. 1 is the pose region, 0 is the non-pose region.
         """
         pose_heights = np.array([pose[1, 3] for pose in poses_list])
+        if pose_heights.size == 0:
+            return np.zeros(self.grid_size[::-1], dtype=np.uint8)
         clusters = DBSCAN(eps=0.1).fit(pose_heights.reshape(-1, 1))
         labels, counts = np.unique(clusters.labels_, return_counts=True)
         id = np.argmax(counts)
