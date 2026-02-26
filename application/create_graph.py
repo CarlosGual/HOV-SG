@@ -38,7 +38,7 @@ def process_scene(params: DictConfig):
         frame_indices = list(range(10, dataset_len, skip))
         # Start from the third idx so the creation graph logic works
         # (problems with floors [at least has to be one] and rooms detections [at least has to be two o them])
-        frame_indices = frame_indices[4:]
+        frame_indices = frame_indices[17:]
         if frame_indices[-1] < dataset_len - 1:
             frame_indices.append(dataset_len - 1)
 
@@ -81,7 +81,7 @@ def main(params: DictConfig):
     scenes_root = os.path.join(params.main.dataset_path, params.main.split)
     scene_ids = sorted([
         d for d in os.listdir(scenes_root)
-        if os.path.isdir(os.path.join(scenes_root, d)) and not d.startswith("no_use")
+        if os.path.isdir(os.path.join(scenes_root, d)) and d.startswith("00890")
     ])
 
     print(f"Found {len(scene_ids)} scenes in {scenes_root}:")
